@@ -9,6 +9,12 @@ interface BatchProcessResult {
     fileName: string
     blob: Blob
     originalFile: File
+    originalPath: string
+}
+
+interface FileWithPath {
+    file: File
+    originalPath: string
 }
 
 interface RandomSettings {
@@ -18,7 +24,7 @@ interface RandomSettings {
 
 export function useBatchScanPDF() {
     const processBatch = async (
-        files: File[],
+        files: FileWithPath[],
         baseConfig: ScanConfig,
         randomSettings: RandomSettings,
         onProgress?: (progress: number, fileName: string) => void
@@ -26,7 +32,8 @@ export function useBatchScanPDF() {
         const results: BatchProcessResult[] = []
 
         for (let i = 0; i < files.length; i++) {
-            const file = files[i]
+            const fileWithPath = files[i]
+            const file = fileWithPath.file
             const fileName = file.name
 
             onProgress?.(i / files.length, fileName)
@@ -43,7 +50,8 @@ export function useBatchScanPDF() {
                 results.push({
                     fileName: fileName.replace(/\.(pdf|docx|doc)$/i, '_scanned.pdf'),
                     blob: processedBlob,
-                    originalFile: file
+                    originalFile: file,
+                    originalPath: fileWithPath.originalPath
                 })
             } catch (error) {
                 console.error(`Error processing ${fileName}:`, error)

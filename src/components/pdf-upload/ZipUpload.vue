@@ -46,9 +46,14 @@ const { t } = useI18n()
 const processing = ref(false)
 const progressPercentage = ref(0)
 
+interface FileWithPath {
+  file: File
+  originalPath: string
+}
+
 const emit = defineEmits<{
   (e: 'update:pdf', file: File | undefined): void
-  (e: 'update:files', files: File[]): void
+  (e: 'update:files', files: FileWithPath[]): void
 }>()
 
 async function onSelectSingle() {
@@ -83,11 +88,11 @@ async function onSelectZip() {
   }
 }
 
-async function processZipFile(zipFile: File): Promise<File[]> {
+async function processZipFile(zipFile: File): Promise<FileWithPath[]> {
   const zip = new JSZip()
   const zipContent = await zip.loadAsync(zipFile)
 
-  const processedFiles: File[] = []
+  const processedFiles: FileWithPath[] = []
   const entries = Object.entries(zipContent.files)
 
   for (let i = 0; i < entries.length; i++) {
@@ -108,12 +113,19 @@ async function processZipFile(zipFile: File): Promise<File[]> {
 
       if (fileExtension === 'pdf') {
         const pdfFile = new File([blob], fileName, { type: 'application/pdf' })
-        processedFiles.push(pdfFile)
+        processedFiles.push({
+          file: pdfFile,
+          originalPath: path
+        })
       } else if (fileExtension === 'docx' || fileExtension === 'doc') {
         const pdfBlob = await convertDocxToPdf(blob, fileName)
         const pdfFileName = fileName.replace(/\.(docx|doc)$/i, '.pdf')
         const pdfFile = new File([pdfBlob], pdfFileName, { type: 'application/pdf' })
-        processedFiles.push(pdfFile)
+        const pdfPath = path.replace(/\.(docx|doc)$/i, '.pdf')
+        processedFiles.push({
+          file: pdfFile,
+          originalPath: pdfPath
+        })
       }
     } catch (error) {
       console.error(`Error processing file ${fileName}:`, error)

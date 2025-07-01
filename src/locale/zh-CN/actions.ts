@@ -26,5 +26,6 @@ export const actions = {
   selectFiles: '选择文件开始',
   noFilesSelected: '未选择文件',
   batchProcessComplete: '批处理完成！已处理{count}个文件。',
-  batchProcessError: '批处理错误：'
+  batchProcessError: '批处理错误：',
+  zipStructureInfo: 'ZIP文件的原始文件夹结构将被保留。DOCX文件将先转换为PDF，然后进行扫描。'
 }

@@ -83,6 +83,7 @@ interface ProcessedFile {
   name: string
   blob: Blob
   originalFile: File
+  originalPath: string
 }
 
 const props = defineProps<{

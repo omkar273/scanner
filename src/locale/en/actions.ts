@@ -26,5 +26,6 @@ export const actions = {
   selectFiles: 'Select files to get started',
   noFilesSelected: 'No files selected',
   batchProcessComplete: 'Batch processing complete! {count} files processed.',
-  batchProcessError: 'Batch processing error: '
+  batchProcessError: 'Batch processing error: ',
+  zipStructureInfo: 'Original folder structure from ZIP file will be preserved. DOCX files will be converted to PDF first, then scanned.'
 }

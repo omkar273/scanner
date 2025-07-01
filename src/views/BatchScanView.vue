@@ -11,10 +11,33 @@
           <div v-if="batchFiles.length > 0">
             <n-card>
               <n-space vertical>
-                <n-text strong>{{ t('actions.filesFound', { count: batchFiles.length }) }}</n-text>
+                <n-space align="center">
+                  <n-text strong>{{
+                    t('actions.filesFound', { count: batchFiles.length })
+                  }}</n-text>
+                  <n-tooltip>
+                    <template #trigger>
+                      <n-icon size="16" style="cursor: help; color: var(--n-text-color-disabled)">
+                        <svg viewBox="0 0 16 16" fill="currentColor">
+                          <path
+                            d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16zM8 4a.905.905 0 0 0-.9.995l.35 3.507a.552.552 0 0 0 1.1 0l.35-3.507A.905.905 0 0 0 8 4zm.002 6a1 1 0 1 0 0 2 1 1 0 0 0 0-2z"
+                          />
+                        </svg>
+                      </n-icon>
+                    </template>
+                    <div style="max-width: 300px">
+                      {{ t('actions.zipStructureInfo') }}
+                    </div>
+                  </n-tooltip>
+                </n-space>
                 <n-list size="small">
-                  <n-list-item v-for="file in batchFiles.slice(0, 5)" :key="file.name">
-                    <n-ellipsis style="max-width: 200px">{{ file.name }}</n-ellipsis>
+                  <n-list-item v-for="file in batchFiles.slice(0, 5)" :key="file.file.name">
+                    <n-space vertical size="small">
+                      <n-ellipsis style="max-width: 200px">{{ file.file.name }}</n-ellipsis>
+                      <n-text depth="3" style="font-size: 0.85em">
+                        Path: {{ file.originalPath }}
+                      </n-text>
+                    </n-space>
                   </n-list-item>
                   <n-list-item v-if="batchFiles.length > 5">
                     <n-text depth="3">{{
@@ -35,7 +58,9 @@
             @downloadSingle="downloadSingle"
             :progress="progress"
             :saving="saving"
-            :files="batchFiles.length > 0 ? batchFiles : singleFile ? [singleFile] : []"
+            :files="
+              batchFiles.length > 0 ? batchFiles.map((f) => f.file) : singleFile ? [singleFile] : []
+            "
             :processedFiles="processedFiles"
             :currentFile="currentFileName"
             :isBatch="batchFiles.length > 0"
@@ -84,7 +109,9 @@ import {
   NList,
   NListItem,
   NEllipsis,
-  NEmpty
+  NEmpty,
+  NTooltip,
+  NIcon
 } from 'naive-ui'
 import MainContainer from '@/components/MainContainer.vue'
 import { type ScanConfig, defaultConfig, MagicaScanner } from '@/utils/scan-renderer/magica-scan'
@@ -121,6 +148,12 @@ interface ProcessedFile {
   name: string
   blob: Blob
   originalFile: File
+  originalPath: string
+}
+
+interface FileWithPath {
+  file: File
+  originalPath: string
 }
 
 interface RandomSettings {
@@ -129,7 +162,7 @@ interface RandomSettings {
 }
 
 const singleFile = ref<File | undefined>(undefined)
-const batchFiles = ref<File[]>([])
+const batchFiles = ref<FileWithPath[]>([])
 const config = ref<ScanConfig>(defaultConfig)
 const randomSettings = ref<RandomSettings>({
   enabled: false,
@@ -142,7 +175,7 @@ const saving = ref(false)
 const currentFileName = ref<string>('')
 
 // Preview functionality
-const previewFile = computed(() => batchFiles.value[0] || singleFile.value)
+const previewFile = computed(() => batchFiles.value[0]?.file || singleFile.value)
 
 const pdfRenderer = computed(() => {
   if (!singleFile.value) return
@@ -170,7 +203,11 @@ const { processBatch } = useBatchScanPDF()
 
 const generateBatch = async () => {
   const filesToProcess =
-    batchFiles.value.length > 0 ? batchFiles.value : singleFile.value ? [singleFile.value] : []
+    batchFiles.value.length > 0
+      ? batchFiles.value
+      : singleFile.value
+        ? [{ file: singleFile.value, originalPath: singleFile.value.name }]
+        : []
 
   if (filesToProcess.length === 0) {
     message.error(t('actions.noFilesSelected'))
@@ -195,7 +232,8 @@ const generateBatch = async () => {
     processedFiles.value = results.map((result) => ({
       name: result.fileName,
       blob: result.blob,
-      originalFile: result.originalFile
+      originalFile: result.originalFile,
+      originalPath: result.originalPath
     }))
 
     message.success(t('actions.batchProcessComplete', { count: results.length }))
@@ -218,11 +256,20 @@ const downloadAll = async () => {
       extensions: ['.pdf']
     })
   } else {
-    // Multiple files - create ZIP
+    // Multiple files - create ZIP preserving original structure
     const zip = new JSZip()
 
     processedFiles.value.forEach((file) => {
-      zip.file(file.name, file.blob)
+      // Use original path structure but with scanned filename
+      const pathParts = file.originalPath.split('/')
+      const originalFileName = pathParts.pop() || file.name
+      const directory = pathParts.join('/')
+
+      // Create the scanned filename
+      const scannedFileName = originalFileName.replace(/\.(pdf|docx|doc)$/i, '_scanned.pdf')
+      const fullPath = directory ? `${directory}/${scannedFileName}` : scannedFileName
+
+      zip.file(fullPath, file.blob)
     })
 
     const zipBlob = await zip.generateAsync({ type: 'blob' })
