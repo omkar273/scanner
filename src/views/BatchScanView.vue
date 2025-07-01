@@ -80,8 +80,25 @@
             <n-space vertical>
               <n-text strong>{{ t('actions.batchPreview') }}</n-text>
               <n-text depth="3">{{ t('actions.batchPreviewDesc') }}</n-text>
+
+              <div v-if="batchFiles.length > 1">
+                <n-text depth="2" style="margin-bottom: 8px; display: block"
+                  >Select file to preview:</n-text
+                >
+                <n-select
+                  v-model:value="selectedFileIndex"
+                  :options="fileSelectOptions"
+                  placeholder="Choose a file to preview"
+                />
+              </div>
+
               <div v-if="previewFile">
-                <n-text>{{ t('actions.previewFile') }}: {{ previewFile.name }}</n-text>
+                <n-space align="center" style="margin: 16px 0 12px 0">
+                  <n-text>{{ t('actions.previewFile') }}: {{ previewFile.name }}</n-text>
+                  <n-text depth="3" v-if="selectedPreviewFile">
+                    Path: {{ selectedPreviewFile.originalPath }}
+                  </n-text>
+                </n-space>
                 <PreviewCompare
                   :pdfRenderer="previewPdfRenderer"
                   :scanRenderer="previewScanRenderer"
@@ -111,10 +128,17 @@ import {
   NEllipsis,
   NEmpty,
   NTooltip,
-  NIcon
+  NIcon,
+  NSelect
 } from 'naive-ui'
 import MainContainer from '@/components/MainContainer.vue'
 import { type ScanConfig, defaultConfig, MagicaScanner } from '@/utils/scan-renderer/magica-scan'
+import {
+  type ScanConfig as CanvasScanConfig,
+  defaultConfig as canvasDefaultConfig,
+  CanvasScanner
+} from '@/utils/scan-renderer/canvas-scan'
+import { featureDetect } from '@/utils/scan-renderer/canvas-scan'
 import ScanSettingsCard from '@/components/scan-settings/ScanSettingsCard.vue'
 import RandomSettingsCard from '@/components/scan-settings/RandomSettingsCard.vue'
 import ZipUpload from '@/components/pdf-upload/ZipUpload.vue'
@@ -144,6 +168,13 @@ useHead({
   meta: [{ name: 'description', content: t('base.description') }]
 })
 
+// Feature detection to choose the appropriate scanner
+const supportCanvasScan = featureDetect()
+console.log('🔍 [BATCH-VIEW] Browser feature detection:', {
+  supportsCanvas: supportCanvasScan,
+  scannerType: supportCanvasScan ? 'CanvasScanner' : 'MagicaScanner'
+})
+
 interface ProcessedFile {
   name: string
   blob: Blob
@@ -163,7 +194,8 @@ interface RandomSettings {
 
 const singleFile = ref<File | undefined>(undefined)
 const batchFiles = ref<FileWithPath[]>([])
-const config = ref<ScanConfig>(defaultConfig)
+const selectedFileIndex = ref(0)
+const config = ref<ScanConfig>(supportCanvasScan ? canvasDefaultConfig : defaultConfig)
 const randomSettings = ref<RandomSettings>({
   enabled: false,
   ranges: defaultRandomRanges
@@ -175,26 +207,59 @@ const saving = ref(false)
 const currentFileName = ref<string>('')
 
 // Preview functionality
-const previewFile = computed(() => batchFiles.value[0]?.file || singleFile.value)
+const previewFile = computed(() => {
+  if (batchFiles.value.length > 0) {
+    const selectedFile = batchFiles.value[selectedFileIndex.value]
+    console.log('🔍 [BATCH-VIEW] Preview file computed:', {
+      selectedIndex: selectedFileIndex.value,
+      fileName: selectedFile?.file.name,
+      fileSize: selectedFile?.file.size,
+      totalFiles: batchFiles.value.length
+    })
+    return selectedFile?.file
+  }
+  return singleFile.value
+})
+
+const selectedPreviewFile = computed(() => {
+  if (batchFiles.value.length > 0) {
+    return batchFiles.value[selectedFileIndex.value]
+  }
+  return null
+})
 
 const pdfRenderer = computed(() => {
   if (!singleFile.value) return
+  console.log('📄 [BATCH-VIEW] Creating PDF renderer for single file:', singleFile.value.name)
   return new PDF(singleFile.value)
 })
 
 const previewPdfRenderer = computed(() => {
   if (!previewFile.value) return
+  console.log('📄 [BATCH-VIEW] Creating preview PDF renderer for:', previewFile.value.name)
   return new PDF(previewFile.value)
 })
 
-const scanRenderer = ref(new ScanCacher(new MagicaScanner(config.value)))
-const previewScanRenderer = ref(new ScanCacher(new MagicaScanner(config.value)))
+// Create scanners based on feature detection
+const createScanner = (config: ScanConfig) => {
+  if (supportCanvasScan) {
+    console.log('🎨 [BATCH-VIEW] Creating CanvasScanner with config:', config)
+    return new ScanCacher(new CanvasScanner(config))
+  } else {
+    console.log('🎨 [BATCH-VIEW] Creating MagicaScanner with config:', config)
+    return new ScanCacher(new MagicaScanner(config))
+  }
+}
+
+const scanRenderer = ref(createScanner(config.value))
+const previewScanRenderer = ref(createScanner(config.value))
 
 watch(
   config,
   (newConfig) => {
-    scanRenderer.value = new ScanCacher(new MagicaScanner(newConfig))
-    previewScanRenderer.value = new ScanCacher(new MagicaScanner(newConfig))
+    console.log('⚙️ [BATCH-VIEW] Config changed, updating scanners:', newConfig)
+    scanRenderer.value = createScanner(newConfig)
+    previewScanRenderer.value = createScanner(newConfig)
   },
   { deep: true }
 )
@@ -289,4 +354,27 @@ const downloadSingle = async (file: ProcessedFile) => {
   })
   message.success(t('actions.downloadComplete'))
 }
+
+// Watch for batch files changes and reset selection
+watch(batchFiles, (newFiles) => {
+  console.log('📥 [BATCH-VIEW] Batch files changed:', {
+    newCount: newFiles.length,
+    files: newFiles.map((f) => ({ name: f.file.name, path: f.originalPath }))
+  })
+  if (newFiles.length > 0) {
+    selectedFileIndex.value = 0
+    console.log('🎯 [BATCH-VIEW] Selected first file for preview:', {
+      selectedIndex: 0,
+      fileName: newFiles[0].file.name,
+      path: newFiles[0].originalPath
+    })
+  }
+})
+
+const fileSelectOptions = computed(() => {
+  return batchFiles.value.map((file, index) => ({
+    label: `${file.file.name} (${file.originalPath})`,
+    value: index
+  }))
+})
 </script>
