@@ -99,11 +99,22 @@
                     Path: {{ selectedPreviewFile.originalPath }}
                   </n-text>
                 </n-space>
-                <PreviewCompare
-                  :pdfRenderer="previewPdfRenderer"
-                  :scanRenderer="previewScanRenderer"
-                  :scale="config.scale"
-                />
+
+                <div v-if="previewPdfRenderer">
+                  <PreviewCompare
+                    :pdfRenderer="previewPdfRenderer"
+                    :scanRenderer="previewScanRenderer"
+                    :scale="config.scale"
+                  />
+                </div>
+
+                <div v-else>
+                  <n-alert type="info" style="margin-top: 16px">
+                    <template #header>Preview Not Available</template>
+                    Preview is currently only available for PDF files. {{ previewFile.name }} will
+                    be processed normally during batch generation.
+                  </n-alert>
+                </div>
               </div>
             </n-space>
           </n-card>
@@ -129,7 +140,8 @@ import {
   NEmpty,
   NTooltip,
   NIcon,
-  NSelect
+  NSelect,
+  NAlert
 } from 'naive-ui'
 import MainContainer from '@/components/MainContainer.vue'
 import { type ScanConfig, defaultConfig, MagicaScanner } from '@/utils/scan-renderer/magica-scan'
@@ -236,8 +248,22 @@ const pdfRenderer = computed(() => {
 
 const previewPdfRenderer = computed(() => {
   if (!previewFile.value) return
-  console.log('📄 [BATCH-VIEW] Creating preview PDF renderer for:', previewFile.value.name)
+  console.log(
+    '📄 [BATCH-VIEW] Creating preview renderer for:',
+    previewFile.value.name,
+    previewFile.value.type
+  )
+
   return new PDF(previewFile.value)
+
+  // // Only create PDF renderer for PDF files
+  // if (previewFile.value.type === 'application/pdf') {
+  //   return new PDF(previewFile.value)
+  // }
+
+  // For non-PDF files, we'll handle them differently in the preview
+  // console.log('ℹ️ [BATCH-VIEW] Non-PDF file detected for preview:', previewFile.value.type)
+  // return null
 })
 
 // Create scanners based on feature detection
@@ -330,8 +356,11 @@ const downloadAll = async () => {
       const originalFileName = pathParts.pop() || file.name
       const directory = pathParts.join('/')
 
-      // Create the scanned filename
-      const scannedFileName = originalFileName.replace(/\.(pdf|docx|doc)$/i, '_scanned.pdf')
+      // Create the scanned filename - all output files are PDFs
+      const scannedFileName = originalFileName.replace(
+        /\.(pdf|docx|doc|ppt|pptx)$/i,
+        '_scanned.pdf'
+      )
       const fullPath = directory ? `${directory}/${scannedFileName}` : scannedFileName
 
       zip.file(fullPath, file.blob)

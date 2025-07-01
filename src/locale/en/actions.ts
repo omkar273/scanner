@@ -27,5 +27,5 @@ export const actions = {
   noFilesSelected: 'No files selected',
   batchProcessComplete: 'Batch processing complete! {count} files processed.',
   batchProcessError: 'Batch processing error: ',
-  zipStructureInfo: 'Original folder structure from ZIP file will be preserved. DOCX files will be converted to PDF first, then scanned.'
+  zipStructureInfo: 'Original folder structure from ZIP file will be preserved. PDF, DOCX, and PPT files are processed directly for optimal performance.'
 }

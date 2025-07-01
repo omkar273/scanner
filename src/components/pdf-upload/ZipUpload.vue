@@ -39,7 +39,6 @@ import { fileOpen } from 'browser-fs-access'
 import { useI18n } from 'vue-i18n'
 import { ref } from 'vue'
 import JSZip from 'jszip'
-import { convertDocxToPdf } from '@/utils/docx-converter'
 
 const { t } = useI18n()
 
@@ -104,34 +103,44 @@ async function processZipFile(zipFile: File): Promise<FileWithPath[]> {
     const fileName = path.split('/').pop() || path
     const fileExtension = fileName.toLowerCase().split('.').pop()
 
-    if (!fileExtension || !['pdf', 'docx', 'doc'].includes(fileExtension)) {
+    if (!fileExtension || !['pdf', 'docx', 'doc', 'ppt', 'pptx'].includes(fileExtension)) {
       continue
     }
 
     try {
       const blob = await file.async('blob')
 
-      if (fileExtension === 'pdf') {
-        const pdfFile = new File([blob], fileName, { type: 'application/pdf' })
-        processedFiles.push({
-          file: pdfFile,
-          originalPath: path
-        })
-      } else if (fileExtension === 'docx' || fileExtension === 'doc') {
-        const pdfBlob = await convertDocxToPdf(blob, fileName)
-        const pdfFileName = fileName.replace(/\.(docx|doc)$/i, '.pdf')
-        const pdfFile = new File([pdfBlob], pdfFileName, { type: 'application/pdf' })
-        const pdfPath = path.replace(/\.(docx|doc)$/i, '.pdf')
-        processedFiles.push({
-          file: pdfFile,
-          originalPath: pdfPath
-        })
-      }
+      // Pass original files without conversion - let the batch processor handle them efficiently
+      const originalFile = new File([blob], fileName, {
+        type: getFileType(fileExtension)
+      })
+
+      processedFiles.push({
+        file: originalFile,
+        originalPath: path
+      })
     } catch (error) {
       console.error(`Error processing file ${fileName}:`, error)
     }
   }
 
   return processedFiles
+}
+
+function getFileType(extension: string): string {
+  switch (extension) {
+    case 'pdf':
+      return 'application/pdf'
+    case 'docx':
+      return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    case 'doc':
+      return 'application/msword'
+    case 'pptx':
+      return 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    case 'ppt':
+      return 'application/vnd.ms-powerpoint'
+    default:
+      return 'application/octet-stream'
+  }
 }
 </script>
