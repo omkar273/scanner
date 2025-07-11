@@ -23,7 +23,7 @@
     "@vicons/material": "^0.12.0",
     "@vicons/tabler": "^0.12.0",
     "browser-fs-access": "^0.35.0",
-    "filesize": "^10.1.0",
+    "filesize": "^11.0.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^2.5.1",
     "jszip": "^3.10.1",
